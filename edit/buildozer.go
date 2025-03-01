@@ -1307,7 +1307,10 @@ func findBuildFiles(rootDir string) []string {
 
 		for _, dirFile := range dirFiles {
 			if dirFile.IsDir() {
-				searchDirs = append(searchDirs, filepath.Join(dir, dirFile.Name()))
+				dirPath := filepath.Join(dir, dirFile.Name())
+				if isWorkspaceRoot, err := wspace.IsWorkspaceRoot(dirPath); err == nil && !isWorkspaceRoot {
+					searchDirs = append(searchDirs, dirPath)
+				}
 			} else {
 				for _, buildFileName := range BuildFileNames {
 					if dirFile.Name() == buildFileName {

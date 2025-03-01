@@ -73,6 +73,28 @@ func findContextPath(rootDir string) (string, error) {
 	return rootDir, nil
 }
 
+func isWorkspaceRoot(dir string, rootFiles map[string]func(os.FileInfo) bool, rootFilesSorted []string) (bool, error) {
+	for _, repoRootFile := range rootFilesSorted {
+		fiFunc := rootFiles[repoRootFile]
+		if fi, err := os.Stat(filepath.Join(dir, repoRootFile)); err == nil && fiFunc(fi) {
+			return true, nil
+		} else if err != nil && !os.IsNotExist(err) {
+			return false, err
+		}
+	}
+	return false, nil
+}
+
+// IsWorkspaceRoot returns true if the given directory is a workspace root.
+func IsWorkspaceRoot(dir string) (bool, error) {
+	rootFilesSorted := make([]string, 0, len(repoRootFiles))
+	for file := range repoRootFiles {
+		rootFilesSorted = append(rootFilesSorted, file)
+	}
+	sort.Strings(rootFilesSorted)
+	return isWorkspaceRoot(dir, repoRootFiles, rootFilesSorted)
+}
+
 // FindWorkspaceRoot splits the current code context (the rootDir if present,
 // the working directory if not.) It returns the path of the directory
 // containing the WORKSPACE file, and the rest.
@@ -104,13 +126,12 @@ func Find(dir string, rootFiles map[string]func(os.FileInfo) bool) (string, erro
 	}
 	sort.Strings(rootFilesSorted)
 
-	for _, repoRootFile := range rootFilesSorted {
-		fiFunc := rootFiles[repoRootFile]
-		if fi, err := os.Stat(filepath.Join(dir, repoRootFile)); err == nil && fiFunc(fi) {
-			return dir, nil
-		} else if err != nil && !os.IsNotExist(err) {
-			return "", err
-		}
+	isWorkspaceRoot, err := isWorkspaceRoot(dir, rootFiles, rootFilesSorted)
+	if err != nil {
+		return "", err
+	}
+	if isWorkspaceRoot {
+		return dir, nil
 	}
 	return Find(filepath.Dir(dir), rootFiles)
 }

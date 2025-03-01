@@ -159,6 +159,24 @@ func setupTestTmpWorkspace(t *testing.T, buildFileName string) (tmp string) {
 	if err := os.WriteFile(filepath.Join(tmp, "a", "c", buildFileName), nil, 0755); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.MkdirAll(filepath.Join(tmp, "nested_workspace"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "nested_workspace", "WORKSPACE"), nil, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "nested_workspace", buildFileName), nil, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(tmp, "nested_module"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "nested_module", "MODULE.bazel"), nil, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "nested_module", buildFileName), nil, 0755); err != nil {
+		t.Fatal(err)
+	}
 	return
 }
 
