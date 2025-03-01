@@ -20,7 +20,6 @@ package wspace
 import (
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/bazelbuild/buildtools/build"
@@ -51,18 +50,24 @@ func isExecutable(fi os.FileInfo) bool {
 	return isFile(fi) && fi.Mode()&0100 == 0100
 }
 
-var repoRootFiles = map[string]func(os.FileInfo) bool{
-	workspaceFile:            isFile,
-	workspaceFile + ".bazel": isFile,
-	"MODULE.bazel":           isFile,
-	"REPO.bazel":             isFile,
-	".buckconfig":            isFile,
-	"pants":                  isExecutable,
+// fileCheck represents a file name and its validation function
+type fileCheck struct {
+	name     string
+	validate func(os.FileInfo) bool
 }
 
-var packageRootFiles = map[string]func(os.FileInfo) bool{
-	buildFile:            isFile,
-	buildFile + ".bazel": isFile,
+var repoRootFiles = []fileCheck{
+	{".buckconfig", isFile},
+	{"MODULE.bazel", isFile},
+	{"REPO.bazel", isFile},
+	{"WORKSPACE", isFile},
+	{"WORKSPACE.bazel", isFile},
+	{"pants", isExecutable},
+}
+
+var packageRootFiles = []fileCheck{
+	{buildFile, isFile},
+	{buildFile + ".bazel", isFile},
 }
 
 // findContextPath finds the context path inside of a WORKSPACE-rooted source tree.
@@ -73,10 +78,9 @@ func findContextPath(rootDir string) (string, error) {
 	return rootDir, nil
 }
 
-func isWorkspaceRoot(dir string, rootFiles map[string]func(os.FileInfo) bool, rootFilesSorted []string) (bool, error) {
-	for _, repoRootFile := range rootFilesSorted {
-		fiFunc := rootFiles[repoRootFile]
-		if fi, err := os.Stat(filepath.Join(dir, repoRootFile)); err == nil && fiFunc(fi) {
+func hasRootFile(dir string, rootFiles []fileCheck) (bool, error) {
+	for _, check := range rootFiles {
+		if fi, err := os.Stat(filepath.Join(dir, check.name)); err == nil && check.validate(fi) {
 			return true, nil
 		} else if err != nil && !os.IsNotExist(err) {
 			return false, err
@@ -87,12 +91,7 @@ func isWorkspaceRoot(dir string, rootFiles map[string]func(os.FileInfo) bool, ro
 
 // IsWorkspaceRoot returns true if the given directory is a workspace root.
 func IsWorkspaceRoot(dir string) (bool, error) {
-	rootFilesSorted := make([]string, 0, len(repoRootFiles))
-	for file := range repoRootFiles {
-		rootFilesSorted = append(rootFilesSorted, file)
-	}
-	sort.Strings(rootFilesSorted)
-	return isWorkspaceRoot(dir, repoRootFiles, rootFilesSorted)
+	return hasRootFile(dir, repoRootFiles)
 }
 
 // FindWorkspaceRoot splits the current code context (the rootDir if present,
@@ -114,23 +113,16 @@ func FindWorkspaceRoot(rootDir string) (root string, rest string) {
 
 // Find searches from the given dir and up for the file that satisfies a condition of `rootFiles`
 // returning the directory containing it, or an error if none found in the tree.
-func Find(dir string, rootFiles map[string]func(os.FileInfo) bool) (string, error) {
+func Find(dir string, rootFiles []fileCheck) (string, error) {
 	if dir == "" || dir == "/" || dir == "." || (len(dir) == 3 && strings.HasSuffix(dir, ":\\")) {
 		return "", os.ErrNotExist
 	}
 
-	// Sort the files to make the function deterministic
-	rootFilesSorted := make([]string, 0, len(rootFiles))
-	for file := range rootFiles {
-		rootFilesSorted = append(rootFilesSorted, file)
-	}
-	sort.Strings(rootFilesSorted)
-
-	isWorkspaceRoot, err := isWorkspaceRoot(dir, rootFiles, rootFilesSorted)
+	isRoot, err := hasRootFile(dir, rootFiles)
 	if err != nil {
 		return "", err
 	}
-	if isWorkspaceRoot {
+	if isRoot {
 		return dir, nil
 	}
 	return Find(filepath.Dir(dir), rootFiles)
