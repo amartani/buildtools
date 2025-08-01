@@ -39,6 +39,7 @@ import (
 	"github.com/bazelbuild/buildtools/file"
 	"github.com/bazelbuild/buildtools/labels"
 	"github.com/bazelbuild/buildtools/wspace"
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
 )
@@ -61,11 +62,12 @@ type Options struct {
 	OutWriter          io.Writer // where to write normal output (`os.Stdout` will be used if not specified)
 	ErrWriter          io.Writer // where to write error output (`os.Stderr` will be used if not specified)
 	RespectBazelignore bool      // whether to use .bazelignore file for ignoring paths
+	RespectRepoBazel   bool      // whether to use REPO.bazel file for ignoring paths
 }
 
 // NewOpts returns a new Options struct with some defaults set.
 func NewOpts() *Options {
-	return &Options{NumIO: 200, PreferEOLComments: true, RespectBazelignore: true}
+	return &Options{NumIO: 200, PreferEOLComments: true, RespectBazelignore: true, RespectRepoBazel: true}
 }
 
 // Usage is a user-overridden func to print the program usage.
@@ -1338,9 +1340,9 @@ var EditFile = func(fi os.FileInfo, name string) error {
 
 // Given a target, whose package may contain a trailing "/...", returns all
 // existing BUILD file paths which match the package.
-func targetExpressionToBuildFiles(rootDir string, target string, respectBazelignore bool) []string {
-	file, _, _, _ := InterpretLabelForWorkspaceLocation(rootDir, target)
-	if rootDir == "" {
+func targetExpressionToBuildFiles(opts *Options, target string) []string {
+	file, _, _, _ := InterpretLabelForWorkspaceLocation(opts.RootDir, target)
+	if opts.RootDir == "" {
 		var err error
 		if file, err = filepath.Abs(file); err != nil {
 			fmt.Printf("Cannot make path absolute: %s\n", err.Error())
@@ -1354,16 +1356,25 @@ func targetExpressionToBuildFiles(rootDir string, target string, respectBazelign
 	}
 
 	var ignoredPrefixes []string
-	if respectBazelignore {
-		ignoredPrefixes = getIgnoredPrefixes(rootDir)
+	if opts.RespectBazelignore {
+		ignoredPrefixes = getIgnoredPrefixes(opts.RootDir)
 	}
-	return findBuildFiles(strings.TrimSuffix(file, suffix), ignoredPrefixes)
+	var ignoredGlobs []string
+	if opts.RespectRepoBazel {
+		var err error
+		ignoredGlobs, err = getRepoBazelIgnoredDirectories(opts.RootDir)
+		if err != nil {
+			log.Printf("buildozer: error loading REPO.bazel ignore_directories(): %v", err)
+		}
+	}
+
+	return findBuildFiles(strings.TrimSuffix(file, suffix), ignoredPrefixes, ignoredGlobs)
 }
 
 // Given a root directory, returns all "BUILD" files in that subtree recursively.
 // ignoredPrefixes are path prefixes to ignore (if a path matches any of these prefixes,
 // it will be skipped along with its subdirectories).
-func findBuildFiles(rootDir string, ignoredPrefixes []string) []string {
+func findBuildFiles(rootDir string, ignoredPrefixes []string, ignoredGlobs []string) []string {
 	var buildFiles []string
 	searchDirs := []string{rootDir}
 
@@ -1380,7 +1391,7 @@ func findBuildFiles(rootDir string, ignoredPrefixes []string) []string {
 		for _, dirFile := range dirFiles {
 			fullPath := filepath.Join(dir, dirFile.Name())
 
-			if shouldIgnorePath(fullPath, rootDir, ignoredPrefixes) {
+			if shouldIgnorePath(fullPath, rootDir, ignoredPrefixes, ignoredGlobs) {
 				continue
 			}
 
@@ -1397,6 +1408,53 @@ func findBuildFiles(rootDir string, ignoredPrefixes []string) []string {
 	}
 
 	return buildFiles
+}
+
+// getRepoBazelIgnoredDirectories returns a list of ignored directory globs from the REPO.bazel file in the root directory.
+func getRepoBazelIgnoredDirectories(rootDir string) ([]string, error) {
+	repoFilePath := filepath.Join(rootDir, "REPO.bazel")
+	repoFileContent, err := os.ReadFile(repoFilePath)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("REPO.bazel exists but couldn't be read: %v", err)
+	}
+
+	// The file path passed to build.Parse is used for error messages.
+	// It's not critical what it is, but it's good to have it be correct.
+	ast, err := build.Parse(repoFilePath, repoFileContent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse REPO.bazel: %v", err)
+	}
+
+	var ignoreDirectories []string
+
+	// Search for ignore_directories([...ignore strings...])
+	for _, stmt := range ast.Stmt {
+		if call, isCall := stmt.(*build.CallExpr); isCall {
+			if ident, isIdent := call.X.(*build.Ident); isIdent && ident.Name == "ignore_directories" {
+				if len(call.List) != 1 {
+					return nil, fmt.Errorf("REPO.bazel ignore_directories() expects one argument")
+				}
+
+				list, isList := call.List[0].(*build.ListExpr)
+				if !isList {
+					return nil, fmt.Errorf("REPO.bazel ignore_directories() unexpected argument type: %T", call.List[0])
+				}
+
+				for _, item := range list.List {
+					if strExpr, isStr := item.(*build.StringExpr); isStr {
+						ignoreDirectories = append(ignoreDirectories, strExpr.Value)
+					}
+				}
+				// Only a single ignore_directories() is supported in REPO.bazel and searching can stop.
+				break
+			}
+		}
+	}
+
+	return ignoreDirectories, nil
 }
 
 // getIgnoredPrefixes returns a list of ignored prefixes from the .bazelignore file in the root directory.
@@ -1430,8 +1488,8 @@ func getIgnoredPrefixes(rootDir string) []string {
 }
 
 // shouldIgnorePath returns true if the path should be ignored based on the list of ignored prefixes.
-func shouldIgnorePath(path string, rootDir string, ignoredPrefixes []string) bool {
-	if len(ignoredPrefixes) == 0 {
+func shouldIgnorePath(path string, rootDir string, ignoredPrefixes []string, ignoredGlobs []string) bool {
+	if len(ignoredPrefixes) == 0 && len(ignoredGlobs) == 0 {
 		return false
 	}
 
@@ -1448,6 +1506,13 @@ func shouldIgnorePath(path string, rootDir string, ignoredPrefixes []string) boo
 			return true
 		}
 	}
+
+	for _, glob := range ignoredGlobs {
+		if match, _ := doublestar.Match(glob, rel); match {
+			return true
+		}
+	}
+
 	return false
 }
 
@@ -1470,7 +1535,7 @@ func appendCommands(opts *Options, commandMap map[string][]commandsForTarget, ar
 		if label := labels.Parse(target); label.Package == stdinPackageName {
 			buildFiles = []string{stdinPackageName}
 		} else {
-			buildFiles = targetExpressionToBuildFiles(opts.RootDir, target, opts.RespectBazelignore)
+			buildFiles = targetExpressionToBuildFiles(opts, target)
 		}
 
 		for _, file := range buildFiles {

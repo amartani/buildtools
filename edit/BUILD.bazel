@@ -21,6 +21,7 @@ go_library(
         "//lang",
         "//tables",
         "//wspace",
+        "@com_github_bmatcuk_doublestar_v4//:go_default_library",
         "@com_github_golang_protobuf//jsonpb:go_default_library_gen",
         "@com_github_golang_protobuf//proto:go_default_library",
     ],

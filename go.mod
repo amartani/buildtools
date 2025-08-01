@@ -8,3 +8,5 @@ require (
 	go.starlark.net v0.0.0-20210223155950-e043a3d3c984
 	google.golang.org/protobuf v1.33.0
 )
+
+require github.com/bmatcuk/doublestar/v4 v4.9.1 // indirect
