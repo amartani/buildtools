@@ -24,6 +24,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bazelbuild/buildtools/bazelignore"
 	"github.com/bazelbuild/buildtools/build"
 	"github.com/google/go-cmp/cmp"
 )
@@ -1054,7 +1055,7 @@ ignored
 				}
 			}
 
-			got := getIgnoredPrefixes(testDir)
+			got := bazelignore.GetIgnoredPrefixes(testDir)
 			if !reflect.DeepEqual(got, tt.expected) {
 				t.Errorf("getIgnoredPrefixes() = %v, want %v", got, tt.expected)
 			}
@@ -1109,7 +1110,7 @@ func TestShouldIgnorePath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := shouldIgnorePath(tt.path, tmp, tt.ignoredPrefixes)
+			got := bazelignore.ShouldIgnorePath(tt.path, tmp, tt.ignoredPrefixes)
 			if got != tt.want {
 				t.Errorf("shouldIgnorePath(%q, %q, %v) = %v, want %v",
 					tt.path, tmp, tt.ignoredPrefixes, got, tt.want)

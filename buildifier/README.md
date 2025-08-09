@@ -26,6 +26,10 @@ in a directory recursively:
 
     $ buildifier -r path/to/dir
 
+By default buildifier will skip directories listed in a workspace's
+`.bazelignore` file when searching recursively. To include those paths, pass
+`--respect_bazelignore=false`.
+
 Buildifier supports the following file types: `BUILD`, `WORKSPACE`, `.bzl`, and
 default, the latter is reserved for Starlark files buildifier doesn't know about
 (e.g. configuration files for third-party projects that use Starlark). The
