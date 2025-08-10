@@ -30,7 +30,8 @@ func ExampleNew() {
 	fmt.Print(c.String())
 	// Output:
 	// {
-	//   "type": "auto"
+	//   "type": "auto",
+	//   "respectBazelignore": true
 	// }
 }
 
@@ -140,7 +141,8 @@ func ExampleExample() {
 	//     "unreachable",
 	//     "unsorted-dict-items",
 	//     "unused-variable"
-	//   ]
+	//   ],
+	//   "respectBazelignore": true
 	// }
 }
 
@@ -164,6 +166,7 @@ func ExampleFlagSet() {
 	// multi_diff: the command specified by the -diff_command flag can diff multiple files in the style of tkdiff (default false) ("false")
 	// path: assume BUILD file has this path relative to the workspace directory ("")
 	// r: find starlark files recursively ("false")
+	// respect_bazelignore: use .bazelignore file for ignoring paths ("true")
 	// tables: path to JSON file with custom table definitions which will replace the built-in tables ("")
 	// type: Input file type: build (for BUILD files), bzl (for .bzl files), workspace (for WORKSPACE files), module (for MODULE.bazel files), default (for generic Starlark files) or auto (default, based on the filename) ("auto")
 	// v: print verbose information to standard error ("false")
@@ -211,6 +214,7 @@ func ExampleFlagSet_parse() {
 	//   "lint": "fix",
 	//   "warnings": "+print,-no-effect",
 	//   "recursive": true,
+	//   "respectBazelignore": true,
 	//   "verbose": true,
 	//   "diffCommand": "diff",
 	//   "multiDiff": true,

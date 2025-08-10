@@ -651,6 +651,32 @@ diff -u json_report ../../golden/json_report_invalid_file_golden || die "$1: wro
 
 cd ../..
 
+# Test --respect_bazelignore flag
+mkdir -p bazelignore_ws/included bazelignore_ws/ignored
+cat > bazelignore_ws/WORKSPACE <<'EOF'
+EOF
+cat > bazelignore_ws/.bazelignore <<'EOF'
+ignored
+EOF
+cat > bazelignore_ws/included/BUILD <<'EOF'
+genrule(name = "a", srcs = ["a"], cmd = "")
+EOF
+# Format included file so check passes when ignoring
+$buildifier bazelignore_ws/included/BUILD
+cat > bazelignore_ws/ignored/BUILD <<'EOF'
+genrule(name = "b",  srcs = ["b"],  cmd = "")
+EOF
+
+pushd bazelignore_ws > /dev/null
+ret=0
+$buildifier --mode=check -r . || ret=$?
+[[ $ret -eq 0 ]] || die "$1: .bazelignore not respected by default"
+
+ret=0
+$buildifier --mode=check -r . --respect_bazelignore=false || ret=$?
+[[ $ret -ne 0 ]] || die "$1: --respect_bazelignore=false didn't include ignored paths"
+popd > /dev/null
+
 # Test the multifile functionality
 
 mkdir multifile
