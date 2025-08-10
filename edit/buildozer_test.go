@@ -231,7 +231,7 @@ func runTestTargetExpressionToBuildFiles(t *testing.T, buildFileName string) {
 }
 
 func TestTargetExpressionToBuildFiles(t *testing.T) {
-	for _, buildFileName := range BuildFileNames {
+	for _, buildFileName := range build.BuildFileNames {
 		runTestTargetExpressionToBuildFiles(t, buildFileName)
 	}
 }
@@ -273,7 +273,7 @@ func runTestAppendCommands(t *testing.T, buildFileName string) {
 }
 
 func TestAppendCommands(t *testing.T) {
-	for _, buildFileName := range BuildFileNames {
+	for _, buildFileName := range build.BuildFileNames {
 		runTestAppendCommands(t, buildFileName)
 	}
 }
@@ -1054,9 +1054,9 @@ ignored
 				}
 			}
 
-			got := getIgnoredPrefixes(testDir)
+			got := build.GetIgnoredPrefixes(testDir)
 			if !reflect.DeepEqual(got, tt.expected) {
-				t.Errorf("getIgnoredPrefixes() = %v, want %v", got, tt.expected)
+				t.Errorf("GetIgnoredPrefixes() = %v, want %v", got, tt.expected)
 			}
 		})
 	}
@@ -1109,9 +1109,9 @@ func TestShouldIgnorePath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := shouldIgnorePath(tt.path, tmp, tt.ignoredPrefixes)
+			got := build.ShouldIgnorePath(tt.path, tmp, tt.ignoredPrefixes)
 			if got != tt.want {
-				t.Errorf("shouldIgnorePath(%q, %q, %v) = %v, want %v",
+				t.Errorf("ShouldIgnorePath(%q, %q, %v) = %v, want %v",
 					tt.path, tmp, tt.ignoredPrefixes, got, tt.want)
 			}
 		})

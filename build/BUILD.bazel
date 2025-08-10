@@ -10,6 +10,7 @@ go_yacc(
 go_library(
     name = "build",
     srcs = [
+        "bazelignore.go",
         "lex.go",
         "parse.y.baz.go",  # keep
         "print.go",

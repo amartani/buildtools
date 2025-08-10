@@ -37,7 +37,8 @@ const buildifierJSONFilename = ".buildifier.json"
 // New constructs a Config with default values.
 func New() *Config {
 	return &Config{
-		InputType: "auto",
+		InputType:          "auto",
+		RespectBazelignore: true,
 	}
 }
 
@@ -130,6 +131,8 @@ type Config struct {
 	DisableRewrites ArrayFlags `json:"buildifier_disable,omitempty"`
 	// AllowSort specifies additional sort contexts to treat as safe
 	AllowSort ArrayFlags `json:"allowsort,omitempty"`
+	// RespectBazelignore enables bazelignore file for ignoring paths
+	RespectBazelignore bool `json:"respect_bazelignore,omitempty"`
 
 	// Help is true if the -h flag is set
 	Help bool `json:"-"`
@@ -185,6 +188,7 @@ func (c *Config) FlagSet(name string, errorHandling flag.ErrorHandling) *flag.Fl
 	flags.StringVar(&c.ConfigPath, "config", "", "path to .buildifier.json config file")
 	flags.Var(&c.AllowSort, "allowsort", "additional sort contexts to treat as safe")
 	flags.Var(&c.DisableRewrites, "buildifier_disable", "list of buildifier rewrites to disable")
+	flags.BoolVar(&c.RespectBazelignore, "respect_bazelignore", c.RespectBazelignore, "use .bazelignore file for ignoring paths")
 
 	return flags
 }

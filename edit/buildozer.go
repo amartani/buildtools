@@ -1139,9 +1139,6 @@ func getGlobalVariables(exprs []build.Expr) (vars map[string]*build.AssignExpr) 
 // parts of the tool that generate paths that we may want to examine
 // continue to assume that build files are all named "BUILD".
 
-// BuildFileNames is exported so that users that want to override it
-// in scripts are free to do so.
-var BuildFileNames = [...]string{"BUILD.bazel", "BUILD", "BUCK"}
 
 // Buildifier formats the build file using the buildifier logic.
 type Buildifier interface {
@@ -1181,13 +1178,13 @@ func rewrite(opts *Options, commandsForFile commandsForFile) *rewriteResult {
 		}
 	} else {
 		origName := name
-		for _, suffix := range BuildFileNames {
+		for _, suffix := range build.BuildFileNames {
 			if strings.HasSuffix(name, "/"+suffix) {
 				name = strings.TrimSuffix(name, suffix)
 				break
 			}
 		}
-		for _, suffix := range BuildFileNames {
+		for _, suffix := range build.BuildFileNames {
 			name = name + suffix
 			data, fi, err = file.ReadFile(name)
 			if err == nil {
@@ -1355,100 +1352,9 @@ func targetExpressionToBuildFiles(rootDir string, target string, respectBazelign
 
 	var ignoredPrefixes []string
 	if respectBazelignore {
-		ignoredPrefixes = getIgnoredPrefixes(rootDir)
+		ignoredPrefixes = build.GetIgnoredPrefixes(rootDir)
 	}
-	return findBuildFiles(strings.TrimSuffix(file, suffix), ignoredPrefixes)
-}
-
-// Given a root directory, returns all "BUILD" files in that subtree recursively.
-// ignoredPrefixes are path prefixes to ignore (if a path matches any of these prefixes,
-// it will be skipped along with its subdirectories).
-func findBuildFiles(rootDir string, ignoredPrefixes []string) []string {
-	var buildFiles []string
-	searchDirs := []string{rootDir}
-
-	for len(searchDirs) != 0 {
-		lastIndex := len(searchDirs) - 1
-		dir := searchDirs[lastIndex]
-		searchDirs = searchDirs[:lastIndex]
-
-		dirFiles, err := os.ReadDir(dir)
-		if err != nil {
-			continue
-		}
-
-		for _, dirFile := range dirFiles {
-			fullPath := filepath.Join(dir, dirFile.Name())
-
-			if shouldIgnorePath(fullPath, rootDir, ignoredPrefixes) {
-				continue
-			}
-
-			if dirFile.IsDir() {
-				searchDirs = append(searchDirs, fullPath)
-			} else {
-				for _, buildFileName := range BuildFileNames {
-					if dirFile.Name() == buildFileName {
-						buildFiles = append(buildFiles, fullPath)
-					}
-				}
-			}
-		}
-	}
-
-	return buildFiles
-}
-
-// getIgnoredPrefixes returns a list of ignored prefixes from the .bazelignore file in the root directory.
-// It returns an empty list if the file does not exist.
-func getIgnoredPrefixes(rootDir string) []string {
-	bazelignorePath := filepath.Join(rootDir, ".bazelignore")
-	ignoredPaths := []string{}
-
-	data, err := os.ReadFile(bazelignorePath)
-	if err != nil {
-		return ignoredPaths
-	}
-
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-	lineNum := 0
-
-	for scanner.Scan() {
-		lineNum++
-		line := strings.TrimSpace(scanner.Text())
-
-		// Skip empty lines, comments, and absolute paths
-		// Bazel will error out if there are any absolute paths in the .bazelignore file.
-		if line == "" || strings.HasPrefix(line, "#") || path.IsAbs(line) {
-			continue
-		}
-
-		ignoredPaths = append(ignoredPaths, path.Clean(line))
-	}
-
-	return ignoredPaths
-}
-
-// shouldIgnorePath returns true if the path should be ignored based on the list of ignored prefixes.
-func shouldIgnorePath(path string, rootDir string, ignoredPrefixes []string) bool {
-	if len(ignoredPrefixes) == 0 {
-		return false
-	}
-
-	rel, err := filepath.Rel(rootDir, path)
-	if err != nil {
-		return false
-	}
-	// Normalize path separators to forward slashes
-	rel = filepath.ToSlash(rel)
-
-	for _, prefix := range ignoredPrefixes {
-		// Check if the path exactly matches the prefix or if it's a subdirectory of the prefix.
-		if rel == prefix || strings.HasPrefix(rel, prefix+"/") {
-			return true
-		}
-	}
-	return false
+	return build.FindBuildFiles(strings.TrimSuffix(file, suffix), ignoredPrefixes)
 }
 
 // appendCommands adds the given commands to be applied to each of the given targets
@@ -1459,7 +1365,7 @@ func appendCommands(opts *Options, commandMap map[string][]commandsForTarget, ar
 		return err
 	}
 	for _, target := range targets {
-		for _, buildFileName := range BuildFileNames {
+		for _, buildFileName := range build.BuildFileNames {
 			if strings.HasSuffix(target, filepath.FromSlash("/"+buildFileName)) {
 				target = strings.TrimSuffix(target, filepath.FromSlash("/"+buildFileName)) + ":__pkg__"
 			} else if strings.HasSuffix(target, "/"+buildFileName) {

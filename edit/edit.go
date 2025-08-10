@@ -66,7 +66,7 @@ func InterpretLabelForWorkspaceLocation(root, target string) (buildFile, repo, p
 			pkg = path.Dir(pkg)
 			return
 		}
-		for _, buildFileName := range BuildFileNames {
+		for _, buildFileName := range build.BuildFileNames {
 			buildFile = filepath.Join(pkgPath, buildFileName)
 			if wspace.IsRegularFile(buildFile) {
 				return
@@ -83,7 +83,7 @@ func InterpretLabelForWorkspaceLocation(root, target string) (buildFile, repo, p
 	}
 
 	found := false
-	for _, buildFileName := range BuildFileNames {
+	for _, buildFileName := range build.BuildFileNames {
 		buildFile = filepath.Join(pkg, buildFileName)
 		if wspace.IsRegularFile(buildFile) {
 			found = true

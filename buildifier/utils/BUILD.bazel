@@ -12,6 +12,7 @@ go_library(
     deps = [
         "//build",
         "//warn",
+        "//wspace",
     ],
 )
 

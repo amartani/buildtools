@@ -37,7 +37,7 @@ var buildVersion = "redacted"
 var buildScmRevision = "redacted"
 
 func usage() {
-	fmt.Fprintf(flag.CommandLine.Output(), `usage: buildifier [-d] [-v] [-r] [-config=path.json] [-diff_command=command] [-help] [-multi_diff] [-mode=mode] [-lint=lint_mode] [-path=path] [files...]
+	fmt.Fprintf(flag.CommandLine.Output(), `usage: buildifier [-d] [-v] [-r] [-config=path.json] [-diff_command=command] [-help] [-multi_diff] [-mode=mode] [-lint=lint_mode] [-path=path] [-respect_bazelignore] [files...]
 
 Buildifier applies standard formatting to the named Starlark files.  The mode
 flag selects the processing: check, diff, fix, or print_if_changed.  In check
@@ -190,7 +190,7 @@ func (b *buildifier) run(args []string) int {
 		files := args
 		if b.config.Recursive {
 			var err error
-			files, err = utils.ExpandDirectories(&args)
+			files, err = utils.ExpandDirectories(&args, b.config.RespectBazelignore)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "buildifier: %v\n", err)
 				return 3

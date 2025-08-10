@@ -25,6 +25,7 @@ import (
 
 	"github.com/bazelbuild/buildtools/build"
 	"github.com/bazelbuild/buildtools/warn"
+	"github.com/bazelbuild/buildtools/wspace"
 )
 
 func isStarlarkFile(name string) bool {
@@ -49,9 +50,23 @@ func skip(info os.FileInfo) bool {
 
 // ExpandDirectories takes a list of file/directory names and returns a list with file names
 // by traversing each directory recursively and searching for relevant Starlark files.
-func ExpandDirectories(args *[]string) ([]string, error) {
+func ExpandDirectories(args *[]string, respectBazelignore bool) ([]string, error) {
 	files := []string{}
+
 	for _, arg := range *args {
+		var ignoredPrefixes []string
+		var rootDir string
+		if respectBazelignore {
+			rootDir, _ = wspace.Find(arg, map[string]func(os.FileInfo) bool{
+				".bazelignore": func(fi os.FileInfo) bool {
+					return fi.Mode()&os.ModeType == 0
+				},
+			})
+			if rootDir != "" {
+				ignoredPrefixes = build.GetIgnoredPrefixes(rootDir)
+			}
+		}
+
 		info, err := os.Stat(arg)
 		if err != nil {
 			return []string{}, err
@@ -63,6 +78,12 @@ func ExpandDirectories(args *[]string) ([]string, error) {
 		err = filepath.Walk(arg, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
+			}
+			if build.ShouldIgnorePath(path, rootDir, ignoredPrefixes) {
+				if info.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
 			}
 			if skip(info) {
 				return filepath.SkipDir

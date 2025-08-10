@@ -355,7 +355,8 @@ cat > golden/.buildifier.example.json <<EOF
     "unreachable",
     "unsorted-dict-items",
     "unused-variable"
-  ]
+  ],
+  "respect_bazelignore": true
 }
 EOF
 
@@ -689,3 +690,22 @@ EOF
 
 $buildifier --lint=warn --warnings=deprecated-function BUILD 2> report || ret=$?
 diff -u report_golden report || die "$1: wrong console output for multifile warnings (WORKSPACE exists)"
+
+cd ..
+
+# Test .bazelignore
+mkdir -p bazelignore_test/subdir
+echo "subdir" > bazelignore_test/.bazelignore
+echo "load(':foo.bzl', 'foo'); foo(tags=['b', 'a'],srcs=['d', 'c'])" > bazelignore_test/BUILD
+echo "load(':foo.bzl', 'foo'); foo(tags=['b', 'a'],srcs=['d', 'c'])" > bazelignore_test/subdir/BUILD
+
+# With default (--respect_bazelignore=true), subdir/BUILD should be ignored
+"$buildifier" -r bazelignore_test
+diff -u bazelignore_test/BUILD golden/BUILD.golden
+if ! diff -u <(echo "load(':foo.bzl', 'foo'); foo(tags=['b', 'a'],srcs=['d', 'c'])") <(cat bazelignore_test/subdir/BUILD); then
+  die ".bazelignore not respected"
+fi
+
+# With --respect_bazelignore=false, subdir/BUILD should be formatted
+"$buildifier" -r --respect_bazelignore=false bazelignore_test
+diff -u bazelignore_test/subdir/BUILD golden/BUILD.golden
