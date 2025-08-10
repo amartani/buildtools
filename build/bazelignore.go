@@ -1,4 +1,4 @@
-package bazelignore
+package build
 
 import (
 	"bufio"

@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bazelbuild/buildtools/bazelignore"
 	"github.com/bazelbuild/buildtools/build"
 	"github.com/bazelbuild/buildtools/warn"
 	"github.com/bazelbuild/buildtools/wspace"
@@ -69,7 +68,7 @@ func ExpandDirectories(args *[]string, respectBazelignore bool) ([]string, error
 		var root string
 		if respectBazelignore {
 			if root, _ = wspace.FindWorkspaceRoot(arg); root != "" {
-				ignored = bazelignore.GetIgnoredPrefixes(root)
+				ignored = build.GetIgnoredPrefixes(root)
 			}
 		}
 
@@ -83,7 +82,7 @@ func ExpandDirectories(args *[]string, respectBazelignore bool) ([]string, error
 
 			if respectBazelignore && root != "" {
 				abs, err := filepath.Abs(path)
-				if err == nil && bazelignore.ShouldIgnorePath(abs, root, ignored) {
+				if err == nil && build.ShouldIgnorePath(abs, root, ignored) {
 					if info.IsDir() {
 						return filepath.SkipDir
 					}

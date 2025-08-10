@@ -34,7 +34,6 @@ import (
 	"strings"
 
 	apipb "github.com/bazelbuild/buildtools/api_proto"
-	"github.com/bazelbuild/buildtools/bazelignore"
 	"github.com/bazelbuild/buildtools/build"
 	"github.com/bazelbuild/buildtools/edit/bzlmod"
 	"github.com/bazelbuild/buildtools/file"
@@ -1356,7 +1355,7 @@ func targetExpressionToBuildFiles(rootDir string, target string, respectBazelign
 
 	var ignoredPrefixes []string
 	if respectBazelignore {
-		ignoredPrefixes = bazelignore.GetIgnoredPrefixes(rootDir)
+		ignoredPrefixes = build.GetIgnoredPrefixes(rootDir)
 	}
 	return findBuildFiles(strings.TrimSuffix(file, suffix), ignoredPrefixes)
 }
@@ -1381,7 +1380,7 @@ func findBuildFiles(rootDir string, ignoredPrefixes []string) []string {
 		for _, dirFile := range dirFiles {
 			fullPath := filepath.Join(dir, dirFile.Name())
 
-			if bazelignore.ShouldIgnorePath(fullPath, rootDir, ignoredPrefixes) {
+			if build.ShouldIgnorePath(fullPath, rootDir, ignoredPrefixes) {
 				continue
 			}
 
